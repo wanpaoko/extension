@@ -21,28 +21,45 @@ function scanPage() {
     }
   });
 
-  if (found) {
-    chrome.runtime.sendMessage({
-      type: "INJECTION_DETECTED",
-      patterns: detectedPatterns
-    });
-  } else {
-    chrome.runtime.sendMessage({
-      type: "SAFE"
-    });
+  // Check if extension context is still valid
+  if (!chrome.runtime?.id) {
+    return;
+  }
+
+  try {
+    if (found) {
+      chrome.runtime.sendMessage({
+        type: "INJECTION_DETECTED",
+        patterns: detectedPatterns
+      });
+    } else {
+      chrome.runtime.sendMessage({
+        type: "SAFE"
+      });
+    }
+  } catch (error) {
+    // Extension context invalidated, stop observing
+    if (error.message.includes('Extension context invalidated')) {
+      observer.disconnect();
+    }
   }
 }
 
-// Initial scan
-scanPage();
-
 // Optional: Observe changes for dynamic content (SPA)
-const observer = new MutationObserver(() => {
-  scanPage();
-});
+let observer;
 
-observer.observe(document.body, {
-  childList: true,
-  subtree: true,
-  characterData: true
-});
+// Only initialize if extension context is valid
+if (chrome.runtime?.id) {
+  // Initial scan
+  scanPage();
+
+  observer = new MutationObserver(() => {
+    scanPage();
+  });
+
+  observer.observe(document.body, {
+    childList: true,
+    subtree: true,
+    characterData: true
+  });
+}
